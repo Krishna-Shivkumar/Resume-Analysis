@@ -79,5 +79,5 @@ def extract_entities(text: str) -> Dict:
         "skills": skills,
         "experience": jobs,
         "total_experience_months": total_months,
-        "text": text  # Keep full cleaned text for further analysis
+        "text": text  
     }
