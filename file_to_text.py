@@ -66,6 +66,10 @@ def analyze_resume(resume_file, job_file, resume_type='pdf'):
         resume_keywords = extract_pdf_keywords(resume_file)
     elif resume_type == 'docx':
         resume_keywords = extract_docx_keywords(resume_file)
+    elif resume_type =='txt':
+        text = resume_file.read()
+        if isinstance(text, bytes):
+            text = text.decode('utf-8')
     else:
         raise ValueError("Unsupported resume type: must be 'pdf', 'docx', or 'txt'")
 
