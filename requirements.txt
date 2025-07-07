@@ -5,4 +5,5 @@ spaCy
 dateparser
 flashtext
 pandas
-pyreparser
+datetime
+python-dateutil
