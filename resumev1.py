@@ -1,31 +1,40 @@
-from fpdf import FPDF
-from pyresparser import ResumeParser
-import nltk
-
-# Ensure stopwords are available
+import json
+import ollama
+from PyPDF2 import PdfReader
+ 
+def extract_text_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+print('reached1')
+resume_text = extract_text_from_pdf('resume.pdf')
+print('reached2')
+prompt = f"""
+Extract all work experiences from the resume below.
+Return the output as a JSON array with fields: job_title, company, start_date, end_date.
+ 
+Resume:
+\"\"\"
+{resume_text}
+\"\"\"
+"""
+print('reached3')
+# Send the prompt to Ollama (default at localhost:11434)
+response = ollama.generate(
+    model= "mistral:7b",
+    prompt= prompt,
+    stream= False)
+   
+ 
+# Parse and print the model's response
+result = response['response']
+print("\n=== Raw LLM Response ===\n")
+print(result)
+ 
+# Optionally try parsing it as JSON (if well formatted)
 try:
-    from nltk.corpus import stopwords
-    _ = stopwords.words('english')
-except LookupError:
-    nltk.download('stopwords')
-
-# # Convert TXT to PDF
-# class PDF(FPDF):
-#     def header(self):
-#         self.set_font("Helvetica", size=12)
-
-# pdf = PDF()
-# pdf.add_page()
-# pdf.set_font("Helvetica", size=12)
-
-# with open("resume.txt", "r", encoding="utf-8") as f:
-#     for line in f:
-#         # Handle Unicode that FPDF may not like
-#         safe_line = line.replace("–", "-").replace("•", "*").encode('latin-1', 'ignore').decode('latin-1')
-#         pdf.multi_cell(0, 10, safe_line.strip())
-
-# pdf.output("your_resume.pdf")
-
-# Parse the resume using pyresparser
-data = ResumeParser("resume.pdf").get_extracted_data()
-print(data)
+    experience_data = json.loads(result)
+    print("\n=== Parsed Experience JSON ===\n")
+    print(json.dumps(experience_data, indent=2))
+except Exception as e:
+    print("\nWarning: Could not parse as JSON.")
+    print(e)
