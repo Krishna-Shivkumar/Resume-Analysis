@@ -58,31 +58,47 @@ if submitted and job_file and resume_files:
     progress_bar = st.progress(0)
 
     total = len(resume_files)
+    EDUCATION_LEVELS = {"high school":1, "associate":2, "bachelor":3, "master":4, "phd":5}
+    job_edu = 0
+    for e in EDUCATION_LEVELS.keys:
+            if e in j_info['education_level']:
+                job_edu = EDUCATION_LEVELS[e]
     for i, resume_file in enumerate(resume_files):
         resume_text = extract_text(resume_file)
         resume_text = normalize_text(resume_text)
         resume_text = get_lemmas(resume_text)
 
         # You can extract fields using your external functions here
-        prop, notskills = resume_skill (j_info["skills"],resume_text)
+        score, notskills = resume_skill (j_info["skills"],resume_text)
         education = extract_highest_education(resume_text)
         major = extract_major(resume_text)
         work_duration = work_time(resume_text)
-        if (education in j_info ["education_level"]):
-            prop+=100/3
-        results.append({
-            "File Name": resume_file.name,
-            "Score": round(score, 2),
-            "Skills": skills,
-            "Education": education,
-            "Major": major,
-            "Experience (yrs)": work_duration
-        })
+        temp = 0
+        problems = ""
+        for e in EDUCATION_LEVELS.keys:
+            if e in education:
+                temp = EDUCATION_LEVELS[e]
+        if(temp>=job_edu):
+            score+=100/3
+        else:
+            problems+="User does not have the required education level.  User has a <"+education+"> level education.\n"
+        if(work_duration >= int(j_info["required_experience_time"])):
+            score+=100/3
+        elif(work_duration >=0):
+            score+= 100*(work_duration/int(j_info["required_experience_time"]))
+            problems+="User does not have the required experience.  User has "+work_duration+" years of experience.\n"
+        else:
+            raise ValueError("There has been an error evaluating a resume.  Please resubmit and try again.")
+        if len(notskills)>0: problems+='Missing Skills: '
+        for s in notskills:
+            problems+=s+', '
+
+        results[email] = [score, problems]
+        sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
+
+        sorted_dict = dict(sorted_results)
 
         # Sort and display partial results
-        sorted_results = sorted(results, key=lambda x: x["Score"], reverse=True)
-        placeholder.dataframe(sorted_results)  # or placeholder.table(sorted_results)
-
         # Update progress bar
         progress_bar.progress((i + 1) / total)
 

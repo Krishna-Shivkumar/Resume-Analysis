@@ -18,9 +18,9 @@ def resume_skill(skills, resume):
 
 EDUCATION_LEVELS = [
     ("high school", ["high school", "secondary school", "hs diploma", "ged"]),
-    ("associate's", ["associate", "a.a.", "a.s."]),
-    ("bachelor's", ["bachelor", "b.a.", "b.s.", "undergraduate", "college degree"]),
-    ("master's", ["master", "m.a.", "m.s.", "postgraduate"]),
+    ("associate", ["associate", "a.a.", "a.s."]),
+    ("bachelor", ["bachelor", "b.a.", "b.s.", "undergraduate", "college degree"]),
+    ("master", ["master", "m.a.", "m.s.", "postgraduate"]),
     ("phd", ["ph.d", "phd", "doctorate", "doctoral"]),
 ]
 
