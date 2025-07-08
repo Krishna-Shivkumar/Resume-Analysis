@@ -42,13 +42,13 @@ def parse_date(date_str):
 
 def work_time(t):
     try:
-        data = json.loads(t)
+        loaded_data = json.loads(t)
     except:
         match = re.search(r"```json\s*(.*?)\s*```", t, re.DOTALL)
         if not match:
             raise ValueError("No JSON block found in the string.")
         data = match.group(1)
-    loaded_data = json.loads(data)
+        loaded_data = json.loads(data)
     # Calculate total experience in months
     total_months = 0
     for job in loaded_data:

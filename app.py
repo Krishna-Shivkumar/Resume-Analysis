@@ -1,83 +1,38 @@
 import streamlit as st
+import re
 import ollama
 import json
+import spacy
+from docx import Document
 from PyPDF2 import PdfReader
+from work_exp import work_experience, work_time
+from jobposting import job_info
 
 st.set_page_config(page_title="Resume Matcher", layout="wide")
 
 # --- Utils ---
+nlp = spacy.load("en_core_web_sm")
+def extract_text(file):
+    if file.name.endswith(".pdf"):
+        reader = PdfReader(file)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    elif file.name.endswith(".docx"):
+        doc = Document(file)
+        return "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+    else:
+        return ""
+    
+def normalize_text(text: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())
 
-def extract_text_from_pdf(file):
-    reader = PdfReader(file)
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
-
-def extract_resume_info(resume_text):
-    prompt = f"""
-From the resume below, extract the following:
-1. Highest level of education (e.g. High School, Bachelor's, Master's, PhD)
-2. Total years of work experience and a brief summary
-3. A list of relevant skills
-
-Return the output as a JSON object with keys: education_level, experience_summary, skills.
-
-Resume:
-\"\"\"
-{resume_text}
-\"\"\"
-"""
-    response = ollama.generate(model="mistral:7b", prompt=prompt, stream=False)
-    return json.loads(response['response'])
-
-def extract_job_posting_info(job_text):
-    prompt = f"""
-From the job posting below, extract the following:
-1. Highest required level of education
-2. Required experience (years and type)
-3. A list of required or preferred skills
-
-Return the output as a JSON object with keys: education_level, required_experience, skills.
-
-Job Posting:
-\"\"\"
-{job_text}
-\"\"\"
-"""
-    response = ollama.generate(model="mistral:7b", prompt=prompt, stream=False)
-    return json.loads(response['response'])
+def get_lemmas(text: str) -> str:
+    doc = nlp(text)
+    lemmas = [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
+    return " ".join(lemmas)
 
 def calculate_match_score(resume_data, job_data):
-    score = 0
-    edu_levels = ["High School", "Associate's", "Bachelor's", "Master's", "PhD"]
-
-    # Education
-    try:
-        r_edu = resume_data['education_level']
-        j_edu = job_data['education_level']
-        if r_edu in edu_levels and j_edu in edu_levels:
-            if edu_levels.index(r_edu) >= edu_levels.index(j_edu):
-                score += 20
-    except: pass
-
-    # Experience
-    try:
-        r_exp = resume_data['experience_summary'].lower()
-        j_exp = job_data['required_experience'].lower()
-        if any(keyword in r_exp for keyword in j_exp.split()):
-            score += 20
-        if any(num in r_exp for num in ['1', '2', '3', '4', '5', '6', '7', '8', '9']):
-            score += 10
-    except: pass
-
-    # Skills
-    try:
-        r_skills = set(s.lower() for s in resume_data['skills'])
-        j_skills = set(s.lower() for s in job_data['skills'])
-        overlap = r_skills.intersection(j_skills)
-        match_ratio = len(overlap) / len(j_skills) if j_skills else 0
-        score += round(match_ratio * 50)
-    except: pass
-
-    return score
+ # Add back in later
+ t = ''
 
 # --- UI ---
 
@@ -91,14 +46,14 @@ with st.form("upload_form"):
 
 if submitted and job_file and resume_files:
     with st.spinner("🔍 Extracting job posting info..."):
-        job_text = extract_text_from_pdf(job_file)
+        job_text = extract_text(job_file)
         job_data = extract_job_posting_info(job_text)
 
     match_results = []
 
     for file in resume_files:
         with st.spinner(f"📄 Processing {file.name}..."):
-            resume_text = extract_text_from_pdf(file)
+            resume_text = extract_text(file)
             try:
                 resume_data = extract_resume_info(resume_text)
                 score = calculate_match_score(resume_data, job_data)
