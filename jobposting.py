@@ -30,10 +30,11 @@ def job_info(job_posting_text):
         stream=False
     )
     result = response['response']
+    print(result)
     try:
-        loaded_data = json.loads(t)
+        loaded_data = json.loads(result)
     except:
-        match = re.search(r"```json\s*(.*?)\s*```", t, re.DOTALL)
+        match = re.search(r"```json\s*(.*?)\s*```", result, re.DOTALL)
         if not match:
             raise ValueError("No JSON block found in the string.")
         data = match.group(1)

@@ -7,6 +7,7 @@ from docx import Document
 from PyPDF2 import PdfReader
 from work_exp import work_experience, work_time
 from jobposting import job_info
+from skills_and_education import resume_skill, extract_highest_education, extract_major
 
 st.set_page_config(page_title="Resume Matcher", layout="wide")
 
@@ -30,6 +31,7 @@ def get_lemmas(text: str) -> str:
     lemmas = [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
     return " ".join(lemmas)
 
+
 def calculate_match_score(resume_data, job_data):
  # Add back in later
  t = ''
@@ -47,37 +49,43 @@ with st.form("upload_form"):
 if submitted and job_file and resume_files:
     with st.spinner("🔍 Extracting job posting info..."):
         job_text = extract_text(job_file)
-        job_data = extract_job_posting_info(job_text)
+        job_text= normalize_text (job_text)
+        job_text= get_lemmas (job_text)
+        j_info=job_info(job_text)
 
-    match_results = []
+        results = {}
+    placeholder = st.empty()  # For dynamic updates
+    progress_bar = st.progress(0)
 
-    for file in resume_files:
-        with st.spinner(f"📄 Processing {file.name}..."):
-            resume_text = extract_text(file)
-            try:
-                resume_data = extract_resume_info(resume_text)
-                score = calculate_match_score(resume_data, job_data)
-                match_results.append({
-                    "filename": file.name,
-                    "score": score,
-                    "resume_data": resume_data
-                })
-            except Exception as e:
-                st.error(f"❌ Failed to parse {file.name}: {e}")
+    total = len(resume_files)
+    for i, resume_file in enumerate(resume_files):
+        resume_text = extract_text(resume_file)
+        resume_text = normalize_text(resume_text)
+        resume_text = get_lemmas(resume_text)
 
-    if match_results:
-        st.success(f"✅ Processed {len(match_results)} resumes successfully.")
+        # You can extract fields using your external functions here
+        prop, notskills = resume_skill (j_info["skills"],resume_text)
+        education = extract_highest_education(resume_text)
+        major = extract_major(resume_text)
+        work_duration = work_time(resume_text)
+        if (education in j_info ["education_level"]):
+            prop+=100/3
+        results.append({
+            "File Name": resume_file.name,
+            "Score": round(score, 2),
+            "Skills": skills,
+            "Education": education,
+            "Major": major,
+            "Experience (yrs)": work_duration
+        })
 
-        sorted_results = sorted(match_results, key=lambda x: x["score"], reverse=True)
+        # Sort and display partial results
+        sorted_results = sorted(results, key=lambda x: x["Score"], reverse=True)
+        placeholder.dataframe(sorted_results)  # or placeholder.table(sorted_results)
 
-        st.markdown("### 🏆 Ranked Results")
-        for i, res in enumerate(sorted_results):
-            with st.expander(f"#{i+1}: {res['filename']} — Score: {res['score']}/100", expanded=i==0):
-                st.markdown(f"**Education:** {res['resume_data'].get('education_level', 'N/A')}")
-                st.markdown(f"**Experience:** {res['resume_data'].get('experience_summary', 'N/A')}")
-                st.markdown(f"**Skills:** {', '.join(res['resume_data'].get('skills', []))}")
+        # Update progress bar
+        progress_bar.progress((i + 1) / total)
 
-    else:
-        st.warning("⚠ No successful resumes parsed.")
+    st.success("✅ All resumes have been processed.")
 
 

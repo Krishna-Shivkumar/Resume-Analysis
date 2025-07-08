@@ -13,6 +13,7 @@ def resume_skill(skills, resume):
         else:
             not_skills.append(skill)
     prop/=len(skills)
+    prop=prop*100/3
     return prop, not_skills
 
 EDUCATION_LEVELS = [
