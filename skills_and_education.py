@@ -19,9 +19,9 @@ def resume_skill(skills, resume):
 EDUCATION_LEVELS = [
     ("high school", ["high school", "secondary school", "hs diploma", "ged"]),
     ("associate", ["associate", "a.a.", "a.s."]),
-    ("bachelor", ["bachelor", "b.a.", "b.s.", "undergraduate", "college degree"]),
-    ("master", ["master", "m.a.", "m.s.", "postgraduate"]),
-    ("phd", ["ph.d", "phd", "doctorate", "doctoral"]),
+    ("bachelor", ["bachelor", "b.a.", "b.s.", "undergraduate", "college degree", "B.A"]),
+    ("master", ["master", "m.a.", "m.s.", "postgraduate", "M.A"]),
+    ("phd", ["ph.d", "phd", "doctorate", "doctoral", "PHD"]),
 ]
 
 def extract_highest_education(text: str) -> Optional[str]:

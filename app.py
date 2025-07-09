@@ -3,6 +3,7 @@ import re
 import ollama
 import json
 import spacy
+import unicodedata
 from docx import Document
 from PyPDF2 import PdfReader
 from work_exp import work_experience, work_time
@@ -22,14 +23,22 @@ def extract_text(file):
         return "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
     else:
         return ""
-    
+
+def clean_text(text: str) -> str:
+    """Normalize and clean extracted text from PDF or DOCX."""
+    text = unicodedata.normalize("NFKD", text)      # Normalize Unicode (e.g., weird quotes/spaces)
+    text = text.replace('\xa0', ' ')                # Replace non-breaking spaces
+    text = text.replace('\n', ' ').replace('\r', '')  # Remove newlines
+    text = re.sub(r'\s+', ' ', text)                # Collapse multiple spaces
+    return text.strip()
+
 def extract_email(text: str) -> str:
     """Extract the first email address found in the text."""
     match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
     return match.group(0) if match else "Not found"
 
 def normalize_text(text: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())
+    return re.sub(r"[^a-zA-Z0-9\s@.+\-_/()]", " ", text.lower())
 
 def get_lemmas(text: str) -> str:
     doc = nlp(text)
@@ -54,8 +63,9 @@ with st.form("upload_form"):
 if submitted and job_file and resume_files:
     with st.spinner("🔍 Extracting job posting info..."):
         job_text = extract_text(job_file)
+        # job_text = clean_text(job_text)
         job_text= normalize_text (job_text)
-        job_text= get_lemmas (job_text)
+        # job_text= get_lemmas (job_text)
         j_info=job_info(job_text)
 
         results = {}
@@ -65,55 +75,64 @@ if submitted and job_file and resume_files:
     total = len(resume_files)
     EDUCATION_LEVELS = {"high school":1, "associate":2, "bachelor":3, "master":4, "phd":5}
     job_edu = 0
-    for e in EDUCATION_LEVELS.keys:
+    print(job_edu)
+    for e in EDUCATION_LEVELS.keys():
             if e in j_info['education_level']:
                 job_edu = EDUCATION_LEVELS[e]
-    for i, resume_file in enumerate(resume_files):
-        resume_text = extract_text(resume_file)
-        resume_text = normalize_text(resume_text)
-        resume_text = get_lemmas(resume_text)
+    with st.spinner("🔍 Processing Resumes..."):
+        for i, resume_file in enumerate(resume_files):
+            resume_text = extract_text(resume_file)
+            # resume_text = clean_text(resume_text)
+            resume_text = normalize_text(resume_text)
+            # resume_text = get_lemmas(resume_text)
+            # print(resume_text)
 
-        # You can extract fields using your external functions here
-        score, notskills = resume_skill (j_info["skills"],resume_text)
-        education = extract_highest_education(resume_text)
-        major = extract_major(resume_text)
-        work_duration = work_time(resume_text)
-        temp = 0
-        problems = ""
-        for e in EDUCATION_LEVELS.keys:
-            if e in education:
-                temp = EDUCATION_LEVELS[e]
-        if(temp>=job_edu):
-            score+=100/3
-        else:
-            problems+="User does not have the required education level.  User has a <"+education+"> level education.\n"
-        if(work_duration >= int(j_info["required_experience_time"])):
-            score+=100/3
-        elif(work_duration >=0):
-            score+= 100*(work_duration/int(j_info["required_experience_time"]))
-            problems+="User does not have the required experience.  User has "+work_duration+" years of experience.\n"
-        else:
-            raise ValueError("There has been an error evaluating a resume.  Please resubmit and try again.")
-        if len(notskills)>0: problems+='Missing Skills: '
-        for s in notskills:
-            problems+=s+', '
-        email=extract_email (resume_text)
-        results[email] = [score, problems]
-        sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
+            # You can extract fields using your external functions here
+            score, notskills = resume_skill (j_info["skills"],resume_text)
+            education = extract_highest_education(resume_text)
+            print(education)
+            major = extract_major(resume_text)
+            resume_exp = work_experience(resume_text, j_info['required_experience_field'])
+            work_duration = work_time(resume_exp)
+            temp = 0
+            problems = ""
+            for e in EDUCATION_LEVELS.keys():
+                if e in education:
+                    temp = EDUCATION_LEVELS[e]
+            if(temp>=job_edu):
+                score+=100/3
+            else:
+                problems+="User does not have the required education level.  User has a <"+education+"> level education.\n"
+            try:
+                if(j_info["required_experience_time"] is None):
+                    j_info["required_experience_time"] = 0
+                if(work_duration >= float(j_info["required_experience_time"])):
+                    score+=100/3
+                elif(work_duration >=0):
+                    score+= 100*(work_duration/float(j_info["required_experience_time"]))/3
+                    problems+="User does not have the required experience.  User has "+str({round(work_duration, 2)})+" years of experience.\n"
+                else:
+                    raise ValueError("There has been an error evaluating a resume.  Please resubmit and try again.")
+            except TypeError:
+                raise ValueError("The Job description does not clearly state how much experience is preferred.  Please resubmit a more specific job description.")
+            if len(notskills)>0: problems+='Missing Skills: '
+            for s in notskills:
+                problems+=s+', '
+            email=extract_email(resume_text)
+            results[email] = [score, problems]
+            sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
 
-        sorted_dict = dict(sorted_results)
-
-        # Sort and display partial results
-        # sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
-
-        st.markdown("## 🧾 Current Ranking:")
-        for email, (score, problems) in sorted_results:
-            st.markdown(f"### 📧 {email}")
-            st.write(f"**Score:** {round(score, 2)}")
-            st.write(f"**Issues:**\n{problems if problems else 'None'}")
-            st.divider()
-        # Update progress bar
-        progress_bar.progress((i + 1) / total)
+            # Sort and display partial results
+            # sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
+            with placeholder.container():
+                st.markdown("## 🧾 Current Ranking:")
+                for email, (score, problems) in sorted_results:
+                    st.markdown(f"### 📧 {email}")
+                    st.write(f"**Score:** {round(score, 2)}")
+                    st.write(f"**Issues:**\n{problems if problems else 'None'}")
+                    st.divider()
+            # Update progress bar
+            progress_bar.progress((i + 1) / total)
 
     st.success("✅ All resumes have been processed.")
 
