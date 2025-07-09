@@ -23,6 +23,11 @@ def extract_text(file):
     else:
         return ""
     
+def extract_email(text: str) -> str:
+    """Extract the first email address found in the text."""
+    match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
+    return match.group(0) if match else "Not found"
+
 def normalize_text(text: str) -> str:
     return re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())
 
@@ -42,8 +47,8 @@ st.markdown("## 📊 Bulk Resume Matcher")
 st.markdown("Upload one job posting and 20–30 resumes. We'll rank each resume against the job.")
 
 with st.form("upload_form"):
-    job_file = st.file_uploader("💼 Upload Job Posting PDF", type="pdf", key="job")
-    resume_files = st.file_uploader("📄 Upload 20–30 Resume PDFs", type="pdf", accept_multiple_files=True, key="resumes")
+    job_file = st.file_uploader("💼 Upload Job Posting PDF", type=["pdf","docx"], key="job")
+    resume_files = st.file_uploader("📄 Upload 20–30 Resume PDFs", type=["pdf","docx"], accept_multiple_files=True, key="resumes")
     submitted = st.form_submit_button("Analyze")
 
 if submitted and job_file and resume_files:
@@ -92,7 +97,7 @@ if submitted and job_file and resume_files:
         if len(notskills)>0: problems+='Missing Skills: '
         for s in notskills:
             problems+=s+', '
-
+        email=extract_email (resume_text)
         results[email] = [score, problems]
         sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
 
