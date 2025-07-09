@@ -6,7 +6,7 @@ from docx import Document as DocxDocument
 from PyPDF2 import PdfReader
 from google.cloud import documentai_v1 as documentai
 from fpdf import FPDF
-import unicodedata
+import pandas as pd
 
 from work_exp import work_experience, work_time
 from jobposting import job_info
@@ -22,15 +22,7 @@ PROCESSOR_ID = "4da0edcaa19b9f53"
 # --- Load Spacy model once ---
 nlp = spacy.load("en_core_web_sm")
 
-def clean_text(text):
-    # Normalize unicode to ASCII, e.g., convert “–” to “-”
-    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-
 def docx_to_pdf_bytes(docx_file) -> bytes:
-    """
-    Convert a docx file-like object to PDF bytes in-memory
-    by extracting text, cleaning unicode chars, and writing with fpdf.
-    """
     doc = DocxDocument(docx_file)
     pdf = FPDF()
     pdf.add_page()
@@ -40,14 +32,13 @@ def docx_to_pdf_bytes(docx_file) -> bytes:
     for para in doc.paragraphs:
         text = para.text.strip()
         if text:
-            cleaned = clean_text(text)
-            pdf.multi_cell(0, 10, cleaned)
+            pdf.multi_cell(0, 10, text.encode("latin-1", "replace").decode("latin-1"))
 
-    pdf_bytes = pdf.output(dest='S').encode('latin1')  # output PDF as string, encode to bytes
-    return pdf_bytes
+    pdf.output(name="converted.pdf")
+    with open("converted.pdf", "rb") as f:
+        return f.read()
 
 def parse_document_bytes(file_bytes: bytes, mime_type: str) -> str:
-    """Parse document bytes using Google Document AI and return extracted text."""
     client = documentai.DocumentProcessorServiceClient()
     name = f"projects/{PROJECT_ID}/locations/{LOCATION}/processors/{PROCESSOR_ID}"
     raw_document = documentai.RawDocument(content=file_bytes, mime_type=mime_type)
@@ -55,35 +46,29 @@ def parse_document_bytes(file_bytes: bytes, mime_type: str) -> str:
 
     try:
         result = client.process_document(request=request)
-        document = result.document
-        return document.text
+        return result.document.text
     except Exception as e:
         st.error(f"Error processing document with Document AI: {e}")
         return ""
 
 def normalize_text(text: str) -> str:
-    """Lowercase and remove special characters except spaces."""
     return re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())
 
 def get_lemmas(text: str) -> str:
-    """Lemmatize text and remove stopwords."""
     doc = nlp(text)
     lemmas = [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
     return " ".join(lemmas)
 
 def extract_email(text: str) -> str:
-    """Extract first email from text or return 'Not found'."""
     match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
     return match.group(0) if match else "Not found"
 
-# --- UI ---
-
 st.markdown("## 📊 Bulk Resume Matcher")
-st.markdown("Upload one job posting and 20–30 resumes. We'll rank each resume against the job.")
+st.markdown("Upload one job posting and multiple resumes. We'll rank each resume against the job and provide detailed breakdowns.")
 
 with st.form("upload_form"):
-    job_file = st.file_uploader("💼 Upload Job Posting PDF or DOCX", type=["pdf", "docx"], key="job")
-    resume_files = st.file_uploader("📄 Upload 20–30 Resumes PDFs or DOCXs", type=["pdf", "docx"], accept_multiple_files=True, key="resumes")
+    job_file = st.file_uploader("💼 Upload Job Posting (PDF or DOCX)", type=["pdf", "docx"], key="job")
+    resume_files = st.file_uploader("📄 Upload Resumes (PDFs or DOCXs)", type=["pdf", "docx"], accept_multiple_files=True, key="resumes")
     submitted = st.form_submit_button("Analyze")
 
 if submitted and job_file and resume_files:
@@ -103,13 +88,13 @@ if submitted and job_file and resume_files:
         job_text = get_lemmas(job_text)
         j_info = job_info(job_text)
 
-    results = {}
+    results = []
     total = len(resume_files)
     progress_bar = st.progress(0)
     EDUCATION_LEVELS = {"high school": 1, "associate": 2, "bachelor": 3, "master": 4, "phd": 5}
     job_edu = 0
     for e in EDUCATION_LEVELS.keys():
-        if e in j_info.get('education_level', ''):
+        if e in j_info.get('education_level', '').lower():
             job_edu = EDUCATION_LEVELS[e]
 
     for i, resume_file in enumerate(resume_files):
@@ -129,46 +114,75 @@ if submitted and job_file and resume_files:
             resume_text = normalize_text(resume_text)
             resume_text = get_lemmas(resume_text)
 
-            # Scoring
-            score, notskills = resume_skill(j_info["skills"], resume_text)
+            result = resume_skill(j_info["skills"], resume_text)
+            if len(result) == 2:
+                score, notskills = result
+                matched_skills = []
+            else:
+                score, notskills, matched_skills = result
+
             education = extract_highest_education(resume_text)
             major = extract_major(resume_text)
             work_duration = work_time(resume_text)
             temp = 0
             problems = ""
+            email = extract_email(resume_text)
 
-            for e in EDUCATION_LEVELS.keys():
-                if e in education:
+            for e in EDUCATION_LEVELS:
+                if e in education.lower():
                     temp = EDUCATION_LEVELS[e]
 
             if temp >= job_edu:
                 score += 100 / 3
             else:
-                problems += f"User does not have the required education level. User has a <{education}> level education.\n"
+                problems += f"User does not have the required education level. User has a <{education or 'Education Level Not Found'}> level education.\n"
 
-            if work_duration >= int(j_info.get("required_experience_time", 0)):
+            try:
+                required_years = float(j_info.get("required_experience_time", 0))
+            except:
+                required_years = 0
+
+            if work_duration >= required_years:
                 score += 100 / 3
             elif work_duration >= 0:
-                score += 100 * (work_duration / int(j_info.get("required_experience_time", 1)))
-                problems += f"User does not have the required experience. User has {work_duration} years of experience.\n"
+                score += 100 * (work_duration / (required_years or 1))
+                problems += f"User has {work_duration:.1f} years experience. Job requires {required_years} years.\n"
             else:
                 problems += "Error evaluating work experience duration.\n"
 
-            if len(notskills) > 0:
+            if notskills:
                 problems += "Missing Skills: " + ", ".join(notskills) + "\n"
 
-            email = extract_email(resume_text)
-            results[email] = [score, problems]
+            results.append({
+                "Rank": 0,
+                "Email": email,
+                "Score": round(score, 2),
+                "Education": education or "Not Found",
+                "Experience (Years)": round(work_duration, 2),
+                "Matched Skills": ", ".join(matched_skills) or "None",
+                "Missing Skills": ", ".join(notskills) or "None",
+                "Issues": problems or "None",
+                "Resume Name": resume_file.name
+            })
 
-        progress_bar.progress((i + 1) / total)
+            progress_bar.progress((i + 1) / total)
 
-    sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
+    sorted_results = sorted(results, key=lambda x: x["Score"], reverse=True)
+    for idx, entry in enumerate(sorted_results):
+        entry["Rank"] = idx + 1
 
-    st.markdown("## 🧾 Final Ranking:")
-    for email, (score, problems) in sorted_results:
-        st.markdown(f"### 📧 {email}")
-        st.write(f"**Score:** {round(score, 2)}")
-        st.write(f"**Issues:**\n{problems if problems else 'None'}")
-        st.divider()
+    df = pd.DataFrame(sorted_results)
+
+    st.markdown("## 🧾 Final Ranking Table")
+    st.dataframe(df[["Rank", "Resume Name", "Email", "Score"]], use_container_width=True)
+
+    for entry in sorted_results:
+        with st.expander(f"📧 {entry['Email']} | Score: {entry['Score']} | Rank #{entry['Rank']}"):
+            st.write(f"**Resume:** {entry['Resume Name']}")
+            st.write(f"**Education:** {entry['Education']}")
+            st.write(f"**Experience:** {entry['Experience (Years)']} years")
+            st.write(f"**Matched Skills:** {entry['Matched Skills']}")
+            st.write(f"**Missing Skills:** {entry['Missing Skills']}")
+            st.write(f"**Issues:**\n{entry['Issues']}")
 
     st.success("✅ All resumes have been processed.")
