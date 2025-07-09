@@ -104,6 +104,14 @@ if submitted and job_file and resume_files:
         sorted_dict = dict(sorted_results)
 
         # Sort and display partial results
+        # sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
+
+        st.markdown("## 🧾 Current Ranking:")
+        for email, (score, problems) in sorted_results:
+            st.markdown(f"### 📧 {email}")
+            st.write(f"**Score:** {round(score, 2)}")
+            st.write(f"**Issues:**\n{problems if problems else 'None'}")
+            st.divider()
         # Update progress bar
         progress_bar.progress((i + 1) / total)
 
