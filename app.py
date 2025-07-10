@@ -38,17 +38,12 @@ def extract_email(text: str) -> str:
     return match.group(0) if match else "Not found"
 
 def normalize_text(text: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9\s@.+\-_/()]", " ", text.lower())
+    return text.lower()
 
 def get_lemmas(text: str) -> str:
     doc = nlp(text)
     lemmas = [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
     return " ".join(lemmas)
-
-
-def calculate_match_score(resume_data, job_data):
- # Add back in later
- t = ''
 
 # --- UI ---
 
@@ -63,7 +58,7 @@ with st.form("upload_form"):
 if submitted and job_file and resume_files:
     with st.spinner("🔍 Extracting job posting info..."):
         job_text = extract_text(job_file)
-        # job_text = clean_text(job_text)
+        job_text = clean_text(job_text)
         job_text= normalize_text (job_text)
         # job_text= get_lemmas (job_text)
         j_info=job_info(job_text)
@@ -75,17 +70,17 @@ if submitted and job_file and resume_files:
     total = len(resume_files)
     EDUCATION_LEVELS = {"high school":1, "associate":2, "bachelor":3, "master":4, "phd":5}
     job_edu = 0
-    print(job_edu)
     for e in EDUCATION_LEVELS.keys():
-            if e in j_info['education_level']:
+            if e in j_info['education_level'].lower():
                 job_edu = EDUCATION_LEVELS[e]
+    print(job_edu)
     with st.spinner("🔍 Processing Resumes..."):
         for i, resume_file in enumerate(resume_files):
             resume_text = extract_text(resume_file)
-            # resume_text = clean_text(resume_text)
+            resume_text = clean_text(resume_text)
             resume_text = normalize_text(resume_text)
             # resume_text = get_lemmas(resume_text)
-            # print(resume_text)
+            print(resume_text)
 
             # You can extract fields using your external functions here
             score, notskills = resume_skill (j_info["skills"],resume_text)

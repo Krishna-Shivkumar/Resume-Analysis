@@ -13,14 +13,14 @@ def resume_skill(skills, resume):
         else:
             not_skills.append(skill)
     prop/=len(skills)
-    prop=prop*100/3
+    prop*=100/3
     return prop, not_skills
 
 EDUCATION_LEVELS = [
     ("high school", ["high school", "secondary school", "hs diploma", "ged"]),
     ("associate", ["associate", "a.a.", "a.s."]),
     ("bachelor", ["bachelor", "b.a.", "b.s.", "undergraduate", "college degree", "B.A"]),
-    ("master", ["master", "m.a.", "m.s.", "postgraduate", "M.A"]),
+    ("master", ["master", "m.a.", "m.s.", "postgraduate", "m."]),
     ("phd", ["ph.d", "phd", "doctorate", "doctoral", "PHD"]),
 ]
 
@@ -28,7 +28,7 @@ def extract_highest_education(text: str) -> Optional[str]:
     """Extract the highest education level from text."""
     for level, keywords in reversed(EDUCATION_LEVELS):
         for keyword in keywords:
-            if re.search(rf"\b{re.escape(keyword)}\b", text):
+            if re.search(re.escape(keyword), text, re.IGNORECASE):
                 return level
     return "Education Level Not Found"
 

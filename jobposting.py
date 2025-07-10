@@ -23,6 +23,7 @@ def job_info(job_posting_text):
     \"\"\"
     {job_posting_text}
     \"\"\"
+    Please return the structure in a valid JSON format.
     """
     response = ollama.generate(
         model="mistral:7b",

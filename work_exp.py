@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 def work_experience(resume_text,topic):
     prompt = f"""
     Extract all work experiences from the resume below relevent to:" {topic}.  Do not include Education experience here.
-    Return the output as a JSON array with fields: job_title, company, start_date, end_date.
+    Return the output as a JSON array with fields: job_title, company, start_date, end_date, no abbreviations.
     Return the output as ONLY a JSON object with the following structure:
     {{
         "job_title": "<title>",
@@ -21,6 +21,7 @@ def work_experience(resume_text,topic):
     \"\"\"
     {resume_text}
     \"\"\"
+    Please return the structure in a valid JSON format.
     """
     # Send the prompt to Ollama (default at localhost:11434)
     response = ollama.generate(
