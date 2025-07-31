@@ -23,8 +23,8 @@ def job_info(job_posting_text):
     From the job description below, extract the following:
     1. The highest required level of education (e.g. High School, Bachelor's Degree, Master's Degree, PhD).
     2. The type of experience required (e.g. software engineering, prior experience in customer service, etc).
-    3. The amount of time spent in the field - must be an INTEGER
-    4. A list of relevant skills (Each  skill summarised with 3 words or less, no examples) (e.g. Python, project management, communication, etc).
+    3. The amount of time spent in the field
+    4. A list of relevant skills (e.g. Python, project management, communication, etc).
 
     Return the output as a JSON object with the following structure:
     {{

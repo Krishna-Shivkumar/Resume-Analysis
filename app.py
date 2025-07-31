@@ -6,7 +6,7 @@ import spacy
 import unicodedata
 from docx import Document
 from PyPDF2 import PdfReader
-from work_exp import work_experience, work_time
+from work_exp import work_experience, work_time, extract_resume_info
 from jobposting import job_info
 from skills_and_education import resume_skill, extract_highest_education, extract_major
 
@@ -63,17 +63,10 @@ if submitted and job_file and resume_files:
         # job_text= get_lemmas (job_text)
         j_info=job_info(job_text)
 
+        total = len(resume_files)
         results = {}
     placeholder = st.empty()  # For dynamic updates
     progress_bar = st.progress(0)
-
-    total = len(resume_files)
-    EDUCATION_LEVELS = {"high school":1, "associate":2, "bachelor":3, "master":4, "phd":5}
-    job_edu = 0
-    for e in EDUCATION_LEVELS.keys():
-            if e in j_info['education_level'].lower():
-                job_edu = EDUCATION_LEVELS[e]
-    print(job_edu)
     with st.spinner("🔍 Processing Resumes..."):
         for i, resume_file in enumerate(resume_files):
             resume_text = extract_text(resume_file)
@@ -81,40 +74,41 @@ if submitted and job_file and resume_files:
             resume_text = normalize_text(resume_text)
             # resume_text = get_lemmas(resume_text)
             print(resume_text)
+            resume = extract_resume_info(resume_text, j_info)
 
-            # You can extract fields using your external functions here
-            score, notskills = resume_skill (j_info["skills"],resume_text)
-            education = extract_highest_education(resume_text)
-            print(education)
-            major = extract_major(resume_text)
-            resume_exp = work_experience(resume_text, j_info['required_experience_field'])
-            work_duration = work_time(resume_exp)
-            temp = 0
-            problems = ""
-            for e in EDUCATION_LEVELS.keys():
-                if e in education:
-                    temp = EDUCATION_LEVELS[e]
-            if(temp>=job_edu):
-                score+=100/3
-            else:
-                problems+="User does not have the required education level.  User has a <"+education+"> level education.\n"
-            try:
-                if(j_info["required_experience_time"] is None):
-                    j_info["required_experience_time"] = 0
-                if(work_duration >= float(j_info["required_experience_time"])):
-                    score+=100/3
-                elif(work_duration >=0):
-                    score+= 100*(work_duration/float(j_info["required_experience_time"]))/3
-                    problems+="User does not have the required experience.  User has "+str({round(work_duration, 2)})+" years of experience.\n"
-                else:
-                    raise ValueError("There has been an error evaluating a resume.  Please resubmit and try again.")
-            except TypeError:
-                raise ValueError("The Job description does not clearly state how much experience is preferred.  Please resubmit a more specific job description.")
-            if len(notskills)>0: problems+='Missing Skills: '
-            for s in notskills:
-                problems+=s+', '
-            email=extract_email(resume_text)
-            results[email] = [score, problems]
+            # # You can extract fields using your external functions here
+            # score, notskills = resume_skill (j_info["skills"],resume_text)
+            # education = extract_highest_education(resume_text)
+            # print(education)
+            # major = extract_major(resume_text)
+            # resume_exp = work_experience(resume_text, j_info['required_experience_field'])
+            # work_duration = work_time(resume_exp)
+            # temp = 0
+            # problems = ""
+            # for e in EDUCATION_LEVELS.keys():
+            #     if e in education:
+            #         temp = EDUCATION_LEVELS[e]
+            # if(temp>=job_edu):
+            #     score+=100/3
+            # else:
+            #     problems+="User does not have the required education level.  User has a <"+education+"> level education.\n"
+            # try:
+            #     if(j_info["required_experience_time"] is None):
+            #         j_info["required_experience_time"] = 0
+            #     if(work_duration >= float(j_info["required_experience_time"])):
+            #         score+=100/3
+            #     elif(work_duration >=0):
+            #         score+= 100*(work_duration/float(j_info["required_experience_time"]))/3
+            #         problems+="User does not have the required experience.  User has "+str({round(work_duration, 2)})+" years of experience.\n"
+            #     else:
+            #         raise ValueError("There has been an error evaluating a resume.  Please resubmit and try again.")
+            # except TypeError:
+            #     raise ValueError("The Job description does not clearly state how much experience is preferred.  Please resubmit a more specific job description.")
+            # if len(notskills)>0: problems+='Missing Skills: '
+            # for s in notskills:
+            #     problems+=s+', '
+            # email=extract_email(resume_text)
+            results[resume["email"]] = [int(resume["score"]), resume["reasoning"]]
             sorted_results = sorted(results.items(), key=lambda item: item[1][0], reverse=True)
 
             # Sort and display partial results

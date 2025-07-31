@@ -19,6 +19,39 @@ client = genai.Client(
     api_key=api_k
 )
 
+def extract_resume_info(resume_text, job):
+    prompt = f"""
+        For the resume below, give the following information:
+        1. A score from 0 to 100 (inclusive) as an integer based on how well the Resume matches the job specifications.
+        2. The Reasoning behind why the score is given, at most 3 sentences.
+        3. The applicant's email.
+
+        Return the output as a JSON object with keys: score, reasoning, email.
+
+        Resume:
+        \"\"\"
+        {resume_text}
+        \"\"\"
+        Job Specifications:
+        \"\"\"
+        {job}
+        \"\"\"
+        """
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents= prompt,
+    )
+    t = response.text
+    try:
+        loaded_data = json.loads(t)
+    except:
+        match = re.search(r"```json\s*(.*?)\s*```", t, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON block found in the string.")
+        data = match.group(1)
+        loaded_data = json.loads(data)
+    return loaded_data
+
 
 def work_experience(resume_text,topic):
     prompt = f"""

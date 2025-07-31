@@ -1,5 +1,5 @@
 import json
-import ollama
+import re
 import os
 from google import genai
 from PyPDF2 import PdfReader
@@ -21,25 +21,37 @@ client = genai.Client(
 )
 
 
-def extract_resume_info(resume_text):
+def extract_resume_info(resume_text, job):
     prompt = f"""
-        From the resume below, extract the following:
-        1. Highest level of education (e.g. High School, Bachelor's, Master's, PhD)
-        2. Total years of work experience and a brief summary
-        3. A list of relevant skills
+        For the resume below, give the following information:
+        1. A score from 0 to 100 (inclusive) based on how well the Resume matches the job specifications.
+        2. The Reasoning behind why the score is given, at most 3 sentences.
 
-        Return the output as a JSON object with keys: education_level, experience_summary, skills.
+        Return the output as a JSON object with keys: score, reasoning.
 
         Resume:
         \"\"\"
         {resume_text}
+        \"\"\"
+        Job Specifications:
+        \"\"\"
+        {job}
         \"\"\"
         """
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents= prompt,
     )
-    return response.text
+    t = response.text
+    try:
+        loaded_data = json.loads(t)
+    except:
+        match = re.search(r"```json\s*(.*?)\s*```", t, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON block found in the string.")
+        data = match.group(1)
+        loaded_data = json.loads(data)
+    return loaded_data
 
 def calculate_match_score(resume_data, job_data):
     # Score: out of 100
@@ -79,28 +91,28 @@ def calculate_match_score(resume_data, job_data):
 
     return score
 
-### === Main Logic ===
+# ### === Main Logic ===
 
-print("Reading resume and job posting...")
+# print("Reading resume and job posting...")
 
-resume_text = extract_text_from_pdf("resume.pdf")
-job_text = extract_text_from_pdf("job_posting.pdf")
+# resume_text = extract_text_from_pdf("resume.pdf")
+# job_text = extract_text_from_pdf("job_posting.pdf")
 
-print("Extracting resume information...")
-resume_data = extract_resume_info(resume_text)
-print(json.dumps(resume_data, indent=2))
+# print("Extracting resume information...")
+# resume_data = extract_resume_info(resume_text)
+# print(json.dumps(resume_data, indent=2))
 
-print("\nExtracting job posting information...")
-job_data = extract_job_posting_info(job_text)
-print(json.dumps(job_data, indent=2))
+# print("\nExtracting job posting information...")
+# job_data = extract_job_posting_info(job_text)
+# print(json.dumps(job_data, indent=2))
 
-print("\nCalculating match score...")
-score = calculate_match_score(resume_data, job_data)
-print(f"\n🎯 Match Score: {score}/100")
+# print("\nCalculating match score...")
+# score = calculate_match_score(resume_data, job_data)
+# print(f"\n🎯 Match Score: {score}/100")
 
-if score > 80:
-    print("✅ Strong match!")
-elif score > 50:
-    print("🟡 Moderate match. Consider tweaking your resume.")
-else:
-    print("🔴 Weak match. May need to improve alignment.")
+# if score > 80:
+#     print("✅ Strong match!")
+# elif score > 50:
+#     print("🟡 Moderate match. Consider tweaking your resume.")
+# else:
+#     print("🔴 Weak match. May need to improve alignment.")
