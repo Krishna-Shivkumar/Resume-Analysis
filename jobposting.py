@@ -1,7 +1,21 @@
 import json
 import ollama
 import re
+import os
+from google import genai
 from PyPDF2 import PdfReader
+from dotenv import load_dotenv
+
+load_dotenv()
+api_k = os.getenv("API_KEY")
+# try:
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "intern-api-use.json"
+# except:
+#     print("Key Not Found")
+client = genai.Client(
+    api_key=api_k
+)
+
 
 def job_info(job_posting_text):
     prompt = f"""
@@ -25,12 +39,11 @@ def job_info(job_posting_text):
     \"\"\"
     Please return the structure in a valid JSON format.
     """
-    response = ollama.generate(
-        model="mistral:7b",
-        prompt=prompt,
-        stream=False
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents= prompt,
     )
-    result = response['response']
+    result = response.text
     result = re.sub(r'//.*', '', result)
     # Remove /* */ block comments
     result = re.sub(r'/\*.*?\*/', '', result, flags=re.DOTALL)

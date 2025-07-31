@@ -130,5 +130,3 @@ if submitted and job_file and resume_files:
             progress_bar.progress((i + 1) / total)
 
     st.success("✅ All resumes have been processed.")
-
-

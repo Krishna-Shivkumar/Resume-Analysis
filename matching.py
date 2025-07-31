@@ -1,52 +1,45 @@
 import json
 import ollama
+import os
+from google import genai
 from PyPDF2 import PdfReader
+from dotenv import load_dotenv
+
 
 def extract_text_from_pdf(pdf_path):
     reader = PdfReader(pdf_path)
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
+load_dotenv()
+api_k = os.getenv("API_KEY")
+# try:
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "intern-api-use.json"
+# except:
+#     print("Key Not Found")
+client = genai.Client(
+    api_key=api_k
+)
+
+
 def extract_resume_info(resume_text):
     prompt = f"""
-From the resume below, extract the following:
-1. Highest level of education (e.g. High School, Bachelor's, Master's, PhD)
-2. Total years of work experience and a brief summary
-3. A list of relevant skills
+        From the resume below, extract the following:
+        1. Highest level of education (e.g. High School, Bachelor's, Master's, PhD)
+        2. Total years of work experience and a brief summary
+        3. A list of relevant skills
 
-Return the output as a JSON object with keys: education_level, experience_summary, skills.
+        Return the output as a JSON object with keys: education_level, experience_summary, skills.
 
-Resume:
-\"\"\"
-{resume_text}
-\"\"\"
-"""
-    response = ollama.generate(
-        model="mistral:7b",
-        prompt=prompt,
-        stream=False
+        Resume:
+        \"\"\"
+        {resume_text}
+        \"\"\"
+        """
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents= prompt,
     )
-    return json.loads(response['response'])
-
-def extract_job_posting_info(job_text):
-    prompt = f"""
-From the job posting below, extract the following:
-1. Highest required level of education
-2. Required experience (years and type)
-3. A list of required or preferred skills
-
-Return the output as a JSON object with keys: education_level, required_experience, skills.
-
-Job Posting:
-\"\"\"
-{job_text}
-\"\"\"
-"""
-    response = ollama.generate(
-        model="mistral:7b",
-        prompt=prompt,
-        stream=False
-    )
-    return json.loads(response['response'])
+    return response.text
 
 def calculate_match_score(resume_data, job_data):
     # Score: out of 100

@@ -1,9 +1,24 @@
 import json
 import ollama
 import re
+import os
+from google import genai
 import json
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
+
+
+load_dotenv()
+api_k = os.getenv("API_KEY")
+# try:
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "intern-api-use.json"
+# except:
+#     print("Key Not Found")
+client = genai.Client(
+    api_key=api_k
+)
+
 
 def work_experience(resume_text,topic):
     prompt = f"""
@@ -24,14 +39,12 @@ def work_experience(resume_text,topic):
     Please return the structure in a valid JSON format.
     """
     # Send the prompt to Ollama (default at localhost:11434)
-    response = ollama.generate(
-        model= "mistral:7b",
-        prompt= prompt,
-        stream= False)
-    
-    
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents= prompt,
+    )
+    result = response.text
     # Parse and print the model's response
-    result = response['response']
     print(result)
     return result
 
@@ -49,9 +62,9 @@ def parse_date(date_str):
 
 
 def work_time(t):
-    t = re.sub(r'//.*', '', t)
+#     t = re.sub(r'//.*', '', t)
     # Remove /* */ block comments
-    t = re.sub(r'/\*.*?\*/', '', t, flags=re.DOTALL)
+#     t = re.sub(r'/\*.*?\*/', '', t, flags=re.DOTALL)
     try:
         loaded_data = json.loads(t)
     except:
